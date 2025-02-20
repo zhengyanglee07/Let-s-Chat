@@ -1,101 +1,395 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/services/firebase";
+import { User, onAuthStateChanged } from "firebase/auth";
+import axios from "axios";
+import { io, Socket } from "socket.io-client";
+import {
+  CircularProgress,
+  Avatar,
+  Box,
+  Container,
+  IconButton,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Paper,
+  TextField,
+  Typography,
+  InputBase,
+  Menu,
+  MenuItem,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import SettingsIcon from "@mui/icons-material/Settings";
+import SendIcon from "@mui/icons-material/Send";
+
+interface IMessage {
+  id: string;
+  sender: string;
+  receiver: string;
+  text: string;
+  createdAt: number;
+}
+
+let socket: Socket;
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [search, setSearch] = useState("");
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [messageText, setMessageText] = useState("");
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+  const [activeUids, setActiveUids] = useState<string[]>([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        router.push("/login");
+      } else {
+        setCurrentUser(currentUser);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const setUserOnline = () => {
+    if (!currentUser) return;
+    if (document.visibilityState === "visible") {
+      socket.emit("userOnline", { userId: currentUser.uid });
+    }
+  };
+
+  const setUserOffline = () => {
+
+    if (!currentUser) return;
+    socket.emit("userOffline", { userId: currentUser.uid });
+  };
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    socket = io("http://localhost:3001", {
+      reconnection: true,
+      transports: ["websocket"],
+    });
+
+    setUserOnline();
+
+    socket.on("updateUserList", (users: any) => {
+      setActiveUids(users.map((m) => m.userId));
+    });
+    socket.on("receiveMessage", (message: IMessage) => {
+      setMessages((prev) => [...prev, message]);
+    });
+    document.addEventListener("visibilitychange", setUserOnline);
+    window.addEventListener("focus", setUserOnline);
+    window.addEventListener("blur", setUserOffline);
+    window.addEventListener("beforeunload", setUserOffline);
+
+    return () => {
+      document.removeEventListener("visibilitychange", setUserOnline);
+      window.removeEventListener("focus", setUserOnline);
+      window.removeEventListener("blur", setUserOffline);
+      window.removeEventListener("beforeunload", setUserOffline);
+      socket.disconnect();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const res = await axios.get("/api/getVerifiedUsers");
+      setUsers(res.data.verifiedUsers);
+    };
+    fetchUsers();
+  }, []);
+
+  const filteredUser = useMemo(() => {
+    if (!search) return users;
+    return users.filter((user: any) =>
+      user.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, users]);
+
+  useEffect(() => {
+    if (!selectedUser || !currentUser) return;
+
+    const chatId = [currentUser.uid, selectedUser.uid].sort().join("_");
+    socket.emit("joinChat", chatId);
+
+    const fetchMessages = async () => {
+      try {
+        const res = await axios.get(`/api/messages?chatId=${chatId}`);
+        setMessages(res.data.messages);
+        setTimeout(() => {
+          chatBoxScrollToBottom();
+        }, 100);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+    fetchMessages();
+  }, [selectedUser]);
+
+  const chatBoxScrollToBottom = () => {
+    const chatBox = document.querySelector(`#chatbox-${selectedUser?.uid}`);
+    if (!chatBox) return;
+    chatBox.scrollTo({
+      left: 0,
+      top: chatBox.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  if (loading) {
+    return (
+      <Container sx={{ display: "flex", justifyContent: "center", mt: 5 }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedUser || !currentUser) return;
+
+    const chatId = [currentUser.uid, selectedUser.uid].sort().join("_");
+
+    const newMessage = {
+      sender: currentUser.uid,
+      receiver: selectedUser.uid,
+      text: messageText,
+      createdAt: Date.now(),
+      chatId,
+    };
+
+    socket.emit("sendMessage", newMessage);
+
+    try {
+      await axios.post("/api/messages", newMessage);
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+
+    chatBoxScrollToBottom();
+    setMessageText("");
+  };
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    await auth.signOut(); // Logout function
+    handleClose();
+  };
+
+  return (
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        background: "linear-gradient(135deg, black 50%, white 50%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 2,
+      }}
+    >
+      <Container
+        maxWidth="lg"
+        sx={{
+          display: "flex",
+          height: "85vh",
+          width: "80vw",
+          borderRadius: 3,
+          overflow: "hidden",
+          boxShadow: 3,
+        }}
+        component={Paper}
+        elevation={6}
+      >
+        {/* Left Sidebar (User List) */}
+        <Box
+          sx={{
+            width: "30%",
+            backgroundColor: "#1E1E1E",
+            color: "white",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* Search Bar */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              padding: 2,
+              borderBottom: "1px solid #444",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            <SearchIcon sx={{ marginRight: 1 }} />
+            <InputBase
+              placeholder="Search users..."
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ color: "white", flex: 1 }}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </Box>
+
+          {/* User List */}
+          <List>
+            {filteredUser.length ? (
+              filteredUser.map((user) => (
+                <ListItem
+                  key={user.uid}
+                  sx={{
+                    cursor: "pointer",
+                    "&:hover": { backgroundColor: "#333" },
+                  }}
+                  selected={selectedUser?.uid === user.uid}
+                  onClick={() => setSelectedUser(user)}
+                >
+                  <ListItemAvatar>
+                    <Avatar
+                      sx={{
+                        bgcolor: activeUids.includes(user.uid)
+                          ? "green"
+                          : "gray",
+                      }}
+                    >
+                      {user.name.charAt(0)}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText primary={user.name} />
+                </ListItem>
+              ))
+            ) : (
+              <ListItem>
+                <ListItemText primary="No users found" />
+              </ListItem>
+            )}
+          </List>
+        </Box>
+
+        {/* Right Side (Chat Area) */}
+        <Box
+          sx={{
+            width: "70%",
+            display: "flex",
+            flexDirection: "column",
+            backgroundColor: "white",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: 2,
+              borderBottom: "1px solid #ddd",
+            }}
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            <Typography variant="h6">Chat</Typography>
+            <IconButton onClick={handleClick}>
+              <SettingsIcon />
+            </IconButton>
+            <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+              <MenuItem onClick={handleLogout}>Logout</MenuItem>
+            </Menu>
+          </Box>
+
+          {/* Chat Messages */}
+          <Box
+            id={`chatbox-${selectedUser?.uid}`}
+            sx={{
+              flex: 1,
+              overflowY: "auto",
+              padding: 2,
+              backgroundColor: "#f5f5f5",
+            }}
+          >
+            <List>
+              {messages.length ? (
+                messages.map((msg, idx) => (
+                  <ListItem
+                    key={`${msg.id}-${idx}`}
+                    sx={{
+                      justifyContent:
+                        msg.sender === currentUser?.uid
+                          ? "flex-end"
+                          : "flex-start",
+                    }}
+                  >
+                    {/* {msg.sender !== currentUser?.uid  && (
+                    <ListItemAvatar>
+                      <Avatar>{msg.sender.charAt(0)}</Avatar>
+                    </ListItemAvatar>
+                  )} */}
+                    <Paper
+                      sx={{
+                        padding: 1.5,
+                        maxWidth: "75%",
+                        backgroundColor:
+                          msg.sender === currentUser?.uid
+                            ? "#1976d2"
+                            : "#ffffff",
+                        color:
+                          msg.sender === currentUser?.uid ? "#fff" : "#000",
+                        borderRadius: 2,
+                      }}
+                    >
+                      <ListItemText primary={msg.text} />
+                    </Paper>
+                  </ListItem>
+                ))
+              ) : (
+                <ListItemText primary="Welcome!" />
+              )}
+            </List>
+          </Box>
+
+          {/* Message Input */}
+          <Box
+            sx={{
+              display: "flex",
+              padding: 1,
+              borderTop: "1px solid #ddd",
+              backgroundColor: "white",
+            }}
+          >
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Type a message..."
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            <IconButton color="primary" onClick={handleSendMessage}>
+              <SendIcon />
+            </IconButton>
+          </Box>
+        </Box>
+      </Container>
+    </Box>
   );
 }
