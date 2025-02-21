@@ -6,6 +6,8 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   Box,
@@ -15,6 +17,7 @@ import {
   TextField,
   Typography,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 import { useSnackbarStore } from "@/store/snackbarStore";
 import { useRouter } from "next/navigation";
@@ -31,6 +34,24 @@ export default function Register() {
   const router = useRouter();
 
   const showSnackbar = useSnackbarStore((state) => state.showSnackbar);
+
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const signUpWithGoogle = async () => {
+    setIsGoogleLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const res = await signInWithPopup(auth, provider);
+      if (res) {
+        showSnackbar("Successfully signed up with google", "success");
+        router.push("/");
+      }
+    } catch (err) {
+      console.log(err.code, "error");
+      showSnackbar("Failed to signup with google", "error");
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleRegister = async () => {
     setIsLoading(true);
@@ -126,10 +147,25 @@ export default function Register() {
             color="primary"
             sx={{ mt: 2 }}
             onClick={handleRegister}
-            disabled={isLoading}
+            disabled={isLoading || isGoogleLoading}
           >
             {isLoading ? <CircularProgress size={24} /> : "Sign Up"}
           </Button>
+          <Divider className="py-2" textAlign="center">
+            or
+          </Divider>
+          <button className="bg-white leading-normal flex items-center justify-center px-5 py-2.5 border w-full rounded-lg shadow hover:shadow-lg disabled:opacity-50"
+          onClick={signUpWithGoogle}>
+            <img
+              className="w-[18px] h-[18px]"
+              alt="google"
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+            />
+            <span className="text-[#757575] pl-[16px] text-[14px] flex align-center gap-3">
+              Signup with Google
+              {isGoogleLoading && <CircularProgress size={18} />}
+            </span>
+          </button>
           <Typography variant="body2" sx={{ mt: 2 }}>
             Already have an account?{" "}
             <Link
