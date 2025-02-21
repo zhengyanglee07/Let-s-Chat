@@ -79,7 +79,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentUser) return;
 
-    socket = io("http://localhost:3001", {
+    socket = io(process.env.WEB_SOCKET_URL, {
       reconnection: true,
       transports: ["websocket"],
     });
