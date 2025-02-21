@@ -284,10 +284,10 @@ export default function Home() {
                         height: "max(40,10vw)",
                       }}
                     >
-                      {currentUser?.uid === user.uid ? 'You' : (user?.displayName?.charAt(0) ?? "-")}
+                      {user?.displayName?.charAt(0) ?? "-"}
                     </Avatar>
                   </ListItemAvatar>
-                  { <ListItemText primary={user.displayName} />}
+                  { <ListItemText primary={currentUser?.uid === user.uid ? 'You' : user.displayName} />}
                 </ListItemButton>
               ))
             ) : (
