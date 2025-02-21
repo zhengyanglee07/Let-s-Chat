@@ -284,7 +284,7 @@ export default function Home() {
                         height: "max(40,10vw)",
                       }}
                     >
-                      {user?.displayName?.charAt(0) ?? "-"}
+                      {currentUser?.uid === user.uid ? 'You' : (user?.displayName?.charAt(0) ?? "-")}
                     </Avatar>
                   </ListItemAvatar>
                   { <ListItemText primary={user.displayName} />}
