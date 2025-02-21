@@ -16,9 +16,9 @@ const activeUsers = new Map();
 io.on("connection", (socket) => {
   console.log(`New client connected: ${socket.id}`);
 
-  socket.on("userOnline", (userId) => {
-    activeUsers.set(socket.id, userId);
-    console.log(`User online: ${userId}`);
+  socket.on("userOnline", (user) => {
+    activeUsers.set(socket.id, user);
+    console.log(`User online: ${user.userId}`);
 
     io.emit("updateUserList", Array.from(new Set(activeUsers.values())));
   });

@@ -3,14 +3,7 @@
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/services/firebase";
 import { sendEmailVerification } from "firebase/auth";
-import {
-  Box,
-  Button,
-  Container,
-  Paper,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Container, Paper, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useSnackbarStore } from "@/store/snackbarStore";
 
@@ -25,7 +18,7 @@ const EmailVerification = () => {
         await sendEmailVerification(auth.currentUser);
         showSnackbar("Verification email sent! Check your inbox.", "success");
         setCountdown(60);
-      } catch (error) {
+      } catch (error: any) {
         showSnackbar(error.message, "error");
       }
     }

@@ -39,7 +39,7 @@ export default function Login() {
         showSnackbar("Successfully login with google", "success");
         router.push("/");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log(err.code, "error");
       showSnackbar("Failed to login with google", "error");
     } finally {
@@ -146,7 +146,7 @@ export default function Login() {
           </button>
 
           <Typography variant="body2" sx={{ mt: 2 }}>
-            Don't have an account?{" "}
+            Don&#39;t have an account?{" "}
             <Link
               href="/signup"
               style={{ textDecoration: "none", color: "#1976d2" }}

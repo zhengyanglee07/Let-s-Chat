@@ -12,7 +12,7 @@ export async function GET() {
         return {
           uid: m.uid,
           email: m.email,
-          name: userProfiles[0].displayName ?? '-',
+          displayName: userProfiles[0].displayName ?? '-',
         };
       });
 

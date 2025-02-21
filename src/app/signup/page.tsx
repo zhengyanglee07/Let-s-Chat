@@ -45,7 +45,7 @@ export default function Register() {
         showSnackbar("Successfully signed up with google", "success");
         router.push("/");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log(err.code, "error");
       showSnackbar("Failed to signup with google", "error");
     } finally {
@@ -154,8 +154,10 @@ export default function Register() {
           <Divider className="py-2" textAlign="center">
             or
           </Divider>
-          <button className="bg-white leading-normal flex items-center justify-center px-5 py-2.5 border w-full rounded-lg shadow hover:shadow-lg disabled:opacity-50"
-          onClick={signUpWithGoogle}>
+          <button
+            className="bg-white leading-normal flex items-center justify-center px-5 py-2.5 border w-full rounded-lg shadow hover:shadow-lg disabled:opacity-50"
+            onClick={signUpWithGoogle}
+          >
             <img
               className="w-[18px] h-[18px]"
               alt="google"

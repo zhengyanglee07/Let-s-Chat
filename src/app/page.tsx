@@ -16,6 +16,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  ListItemButton,
   Paper,
   TextField,
   Typography,
@@ -71,7 +72,6 @@ export default function Home() {
   };
 
   const setUserOffline = () => {
-
     if (!currentUser) return;
     socket.emit("userOffline", { userId: currentUser.uid });
   };
@@ -87,7 +87,7 @@ export default function Home() {
     setUserOnline();
 
     socket.on("updateUserList", (users: any) => {
-      setActiveUids(users.map((m) => m.userId));
+      setActiveUids(users.map((m: any) => m.userId));
     });
     socket.on("receiveMessage", (message: IMessage) => {
       setMessages((prev) => [...prev, message]);
@@ -117,11 +117,12 @@ export default function Home() {
   const filteredUser = useMemo(() => {
     if (!search) return users;
     return users.filter((user: any) =>
-      user.name.toLowerCase().includes(search.toLowerCase())
+      user.displayName.toLowerCase().includes(search.toLowerCase())
     );
   }, [search, users]);
 
   useEffect(() => {
+    console.log("selectedUser", selectedUser);
     if (!selectedUser || !currentUser) return;
 
     const chatId = [currentUser.uid, selectedUser.uid].sort().join("_");
@@ -150,6 +151,16 @@ export default function Home() {
       behavior: "smooth",
     });
   };
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   if (loading) {
     return (
@@ -206,18 +217,19 @@ export default function Home() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 2,
+        padding: isMobile ? 0 : 2,
       }}
     >
       <Container
         maxWidth="lg"
         sx={{
           display: "flex",
-          height: "85vh",
-          width: "80vw",
+          height: isMobile ? "100vh" : "85vh",
+          width: isMobile ? "100vw" : "80vw",
           borderRadius: 3,
           overflow: "hidden",
           boxShadow: 3,
+          padding: isMobile ? 0 : "",
         }}
         component={Paper}
         elevation={6}
@@ -253,7 +265,7 @@ export default function Home() {
           <List>
             {filteredUser.length ? (
               filteredUser.map((user) => (
-                <ListItem
+                <ListItemButton
                   key={user.uid}
                   sx={{
                     cursor: "pointer",
@@ -268,13 +280,15 @@ export default function Home() {
                         bgcolor: activeUids.includes(user.uid)
                           ? "green"
                           : "gray",
+                        width: "max(40,10vw)",
+                        height: "max(40,10vw)",
                       }}
                     >
-                      {user.name.charAt(0)}
+                      {user?.displayName?.charAt(0) ?? "-"}
                     </Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={user.name} />
-                </ListItem>
+                  { <ListItemText primary={user.displayName} />}
+                </ListItemButton>
               ))
             ) : (
               <ListItem>
@@ -303,7 +317,27 @@ export default function Home() {
               borderBottom: "1px solid #ddd",
             }}
           >
-            <Typography variant="h6">Chat</Typography>
+            <Typography variant="h6">
+              {selectedUser ? (
+                <div className="flex gap-3 items-center">
+                  <Avatar
+                    sx={{
+                      bgcolor: activeUids.includes(selectedUser.uid)
+                        ? "green"
+                        : "gray",
+                      width: "max(40,10vw)",
+                      height: "max(40,10vw)",
+                    }}
+                  >
+                    {}
+                    {selectedUser?.displayName?.charAt(0) ?? "-"}
+                  </Avatar>
+                  <ListItemText primary={selectedUser.displayName} />
+                </div>
+              ) : (
+                "Chat"
+              )}
+            </Typography>
             <IconButton onClick={handleClick}>
               <SettingsIcon />
             </IconButton>
