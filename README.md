@@ -8,7 +8,7 @@ This project is a modern web application built using **Next.js** with **TypeScri
 
 - **Framework:** Next.js (React-based)
 - **Language:** TypeScript
-- **Authentication:** Firebase (Google Login/Signup)
+- **Authentication:** Firebase (Google & Email/Password Signup/Login)
 
 ### **Backend:**
 
@@ -18,7 +18,7 @@ This project is a modern web application built using **Next.js** with **TypeScri
 
 ## Features
 
-- User authentication with Google Login
+- User authentication with Google Login and Email/Password Signup/Login
 - Real-time chat with Socket.IO
 - User presence tracking (online/offline)
 - Responsive UI with Next.js using Material ui
